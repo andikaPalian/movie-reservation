@@ -24,7 +24,11 @@ const userValidation = (req, res, next) => {
                             message: "User not found",
                         });
                     }
-                    req.user = user;
+                    req.user =  {
+                        userId: user.userId,
+                        name: user.name,
+                        email: user.email,
+                    };
                     next();
             });
         } else {
