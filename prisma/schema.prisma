@@ -16,6 +16,7 @@ datasource db {
 enum AdminRole {
   SUPER_ADMIN
   THEATHER_ADMIN
+  ADMIN
 }
 
 model Admin {
