@@ -44,7 +44,7 @@ const registerUser = async (req, res) => {
             });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 12);
 
         const user = await prisma.user.create({
             data: {
@@ -116,4 +116,131 @@ const loginUser = async (req, res) => {
     }
 }
 
-export {registerUser, loginUser}
+const changeUserEmail = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const {newEmail, password} = req.body;
+
+        if (!userId) {
+            return res.status(400).json({
+                message: "Invalid user id",
+            });
+        }
+
+        if (!validator.isEmail(newEmail)) {
+            return res.status(400).json({
+                message: "Invalid email address",
+            });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: {
+                userId: userId
+            }
+        });
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            })
+        }
+
+        if (newEmail === user.email) {
+            return res.status(400).json({
+                message: "New email address must be different from the current one",
+            });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if(!passwordMatch) {
+            return res.status(401).json({
+                message: "Invalid password",
+            });
+        }
+
+        user.email = newEmail;
+        await prisma.user.update({
+            where: {
+                userId: userId
+            },
+            data: {
+                email: newEmail,
+            },
+        });
+        res.status(200).json({
+            message: "Email address updated successfully",
+            data: {
+                user: {
+                    name: user.name,
+                    email: user.email,
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error during email change:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            error: error.message || "An unexpected error occurred",
+        });
+    }
+}
+
+const changeUserPassword = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const {currentPassword, newPassword} = req.body;
+
+        if (!userId) {
+            return res.status(400).json({
+                message: "Invalid user id",
+            });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: {
+                userId: userId,
+            }
+        });
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        const checkPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!checkPassword) {
+            return res.status(401).json({
+                message: "Invalid password",
+            });
+        }
+
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                message: "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+            });
+        }
+        
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+        user.password = hashedPassword;
+        await prisma.user.update({
+            where: {
+                userId: userId
+            },
+            data: {
+                password: hashedPassword,
+            }
+        });
+        res.status(200).json({
+            message: "Password updated successfully",
+        });
+    } catch (error) {
+        console.error("Error updating password:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            error: error.message || "An unexpected error occurred",
+        });
+    }
+}
+
+export {registerUser, loginUser, changeUserEmail, changeUserPassword}
