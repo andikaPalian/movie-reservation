@@ -124,4 +124,116 @@ const listMovies = async (req, res) => {
     }
 }
 
-export {addMovies, listMovies};
+const updateMovies = async (req, res) => {
+    try {
+        const moviesId = req.params.id;
+        const {title, description, duration, releaseDate, schedules, theaters} = req.body;
+
+        if (!moviesId) {
+            return res.status(400).json({
+                message: "Movies ID is required",
+            });
+        }
+
+        if (typeof title !== "string") {
+            return res.status(400).json({
+                message: "Title must be a string",
+            });
+        }
+
+        if (typeof description !== "string") {
+            return res.status(400).json({
+                message: "Description must be a string",
+            })
+        }
+
+        if (typeof duration !== "number" || duration < 0) {
+            return res.status(400).json({
+                message: "Duration must be a positive number",
+            });
+        }
+
+        if (schedules) {
+            for (const schedule of schedules) {
+                if (new Date(schedule.startTime) > new Date(schedule.endTime)) {
+                    return res.status(400).json({
+                        message: "Start time must be before end time",
+                    });
+                }
+            }
+        }
+
+        const movies = await prisma.movies.findUnique({
+            where: {
+                movieId: moviesId,
+            }
+        });
+        if (!movies) {
+            return res.status(404).json({
+                message: "Movies not found",
+            });
+        }
+
+        const updatedMovies = await prisma.movies.update({
+            where: {
+                movieId: moviesId,
+            },
+            data: {
+                title,
+                description,
+                duration,
+                releaseDate: new Date(releaseDate),
+                schedules: {
+                    deleteMany: {}, // Hapus semua jadwal yang ada sebelumnnya, sebelum membuat jadwal baru
+                    create: schedules?.map(schedule => ({
+                        startTime: new Date(schedule.startTime),
+                        endTime: new Date(schedule.endTime),
+                    })) || [],
+                },
+                theaters: {
+                    connect: theaters?.map(id => ({
+                        theatherId: id,
+                    })) || [],  
+                }
+            }
+        });
+        res.status(200).json({
+            message: "Movie updated successfully",
+            movie: updatedMovies,
+        });
+    } catch (error) {
+        console.error("Error during updating movie:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            error: error.message || "An unexpected error occurred",
+        });
+    }
+}
+
+const deleteMovies = async (req, res) => {
+    try {
+        const moviesId = req.params.id;
+        if (!moviesId) {
+            return res.status(400).json({
+                message: "Movies ID is required",
+            });
+        }
+
+        await prisma.movies.delete({
+            where: {
+                movieId: moviesId,
+            }
+        });
+        res.status(200).json({
+            message: "Movies deleted successfully",
+        });
+    } catch (error) {
+        console.error("Error during deleting movies:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            error: error.message || "An unexpected error occurred",
+        });
+    }
+}
+
+export {addMovies, listMovies, updateMovies, deleteMovies};
