@@ -95,4 +95,33 @@ const addMovies = async (req, res) => {
     }
 }
 
-export {addMovies};
+const listMovies = async (req, res) => {
+    try {
+        const {search} = req.query;
+
+        const movies = await prisma.movies.findMany({
+            where: {
+                title: {
+                    contains: search || "",
+                    mode: "insensitive",
+                },
+            },
+            include: {
+                schedules: true,
+                theaters: true,
+            }
+        });
+        res.status(200).json({
+            message: "Movies retrieved successfully",
+            movies: movies,
+        })
+    } catch (error) {
+        console.error("Error during listing movies:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            error: error.message || "An unexpected error occurred",
+        });
+    }
+}
+
+export {addMovies, listMovies};
