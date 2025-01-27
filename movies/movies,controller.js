@@ -31,26 +31,67 @@ const addMovies = async (req, res) => {
         }
 
         // Validasi ID Theater
+        let theatersConnections = [];
         if (theaters) {
-            const validTheaters = await prisma.theaters.findMany({
+            const existingTheaters = await prisma.theaters.findMany({
                 where: {
-                    theatherId: {
-                        in: theaters,
+                    name: {
+                        in: theaters.map(theater => theater.name),
                     },
                 }
             });
-            
-            if (validTheaters.length !== theaters.length) {
-                return res.status(400).json({
-                    message: "Some theater IDs are invalid",
-                });
+
+            // Menyambungkan theater yang sudah ada
+            theatersConnections = existingTheaters.map(theater => ({
+                theatherId: theater.theatherId,
+            }));
+
+            // Menambahkan theater baru yang belum ada di database
+            const newTheaters = theaters.filter(theater => !existingTheaters.some(existing => existing.name === theater.name));
+
+            // Menambahkan theater baru ke database
+            // const createTheaters = await prisma.theaters.createMany({
+            //     data: newTheaters,
+            // });
+
+            if (newTheaters.length > 0) {
+                // Membuat theater baru satu persatu untuk mendapatkan ID-nya
+                const createdTheaters = await Promise.all(
+                    newTheaters.map(theater => prisma.theaters.create({
+                        data: theater
+                    }))
+                )
+
+                theatersConnections = [
+                    ...theatersConnections,
+                    ...createdTheaters.map(theater => ({
+                        theatherId: theater.theatherId
+                    }))
+                ]
             }
+
+            // Menyambungkan theater baru yang baru saja ditambahkan
+            
+            // if (validTheaters.length !== theaters.length) {
+            //     return res.status(400).json({
+            //         message: "Some theater IDs are invalid",
+            //     });
+            // }
         }
 
         // Validasi Jadwal
         if (schedules) {
             for (const schedule of schedules) {
-                if (new Date(schedule.startTime) > new Date(schedule.endTime)) {
+                const startTime = new Date(schedule.startTime);
+                const endTime = new Date(schedule.endTime);
+
+                if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                    return res.status(400).json({
+                        message: "Invalid date format in schedules",
+                    });
+                }
+
+                if (startTime > endTime) {
                     return res.status(400).json({
                         message: "Start time must be before end time",
                     });
@@ -71,10 +112,12 @@ const addMovies = async (req, res) => {
                     })) || [],
                 },
                 theaters: {
-                    connect: theaters?.map(id => ({
-                        theatherId: id,
-                    })) || [],  
+                    connect: theatersConnections,  
                 }
+            },
+            include: {
+                theaters: true,
+                schedules: true,
             }
         });
         res.status(201).json({

@@ -5,10 +5,8 @@ import { AdminRole } from '@prisma/client';
 
 const adminRouter = express.Router();
 
-adminRouter.use(adminValidation)
-
-adminRouter.post("/register", hasRole(AdminRole.SUPER_ADMIN) , registerAdmin);
+adminRouter.post("/register", adminValidation , hasRole([AdminRole.SUPER_ADMIN]) , registerAdmin);
 adminRouter.post("/login", loginAdmin);
-adminRouter.put("/update-role", hasRole(AdminRole.SUPER_ADMIN), updateRole);
+adminRouter.put("/update-role", adminValidation, hasRole([AdminRole.SUPER_ADMIN]), updateRole);
 
 export default adminRouter;

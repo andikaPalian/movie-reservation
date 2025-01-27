@@ -55,8 +55,14 @@ const hasRole = (role) => {
             });
         }
 
+        if (!Array.isArray(role)) {
+            return res.status(500).json({
+                message: "Internal server error: roles parameter must be an array",
+            });
+        }
+
         // Validasi apakah req.admin.role sama dengan role yang diperlukan
-        if (req.admin.role !== role) {
+        if (!role.includes(req.admin.role)) {
             return res.status(403).json({
                 message: "Forbidden: Admin does not have the required role",
             });
