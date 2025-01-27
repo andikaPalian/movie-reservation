@@ -124,4 +124,55 @@ const loginAdmin = async (req, res) => {
     }
 }
 
-export {registerAdmin, loginAdmin}
+const updateRole = async (req, res) => {
+    try {
+        const {username, role} = req.body;
+        if (!username?.trim() || !role?.trim()) {
+            return res.status(400).json({
+                message: "Username and role are required",
+            });
+        }
+
+        const existsAdmin = await prisma.admin.findUnique({
+            where: {
+                username: username.toLowerCase().trim(),
+            }
+        });
+        if (!existsAdmin) {
+            return res.status(404).json({
+                message: "Admin not found",
+            });
+        }
+
+        const validRole = ["SUPER_ADMIN", "THEATHER_ADMIN" , "ADMIN"];
+        if (!validRole.includes(role)) {
+            return res.status(400).json({
+                message: "Invalid role. Valid roles are SUPER_ADMIN, THEATHER_ADMIN, and ADMIN",
+            });
+        }
+
+        const updateAdmin = await prisma.admin.update({
+            where: {
+                username: username.toLowerCase().trim(),
+            },
+            data: {
+                role: role.toUpperCase().trim(),
+            }
+        });
+        res.status(200).json({
+            message: "Admin role updated successfully",
+            data: {
+                username: updateAdmin.username,
+                role: updateAdmin.role,
+            }
+        });
+    } catch (error) {
+        console.error("Error during admin role update:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            error: error.message || "An unexpected error occurred",
+        });
+    }
+}
+
+export {registerAdmin, loginAdmin, updateRole};
