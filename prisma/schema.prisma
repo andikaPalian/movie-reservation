@@ -20,28 +20,28 @@ enum AdminRole {
 }
 
 model Admin {
-  adminId   Int      @id @default(autoincrement())
-  username  String   @unique
+  adminId   String      @id @default(uuid())
+  username  String      @unique
   password  String
   role      AdminRole   
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 model User {
-  userId    Int      @id @default(autoincrement())
-  email     String   @unique
+  userId    String      @id @default(uuid())
+  email     String      @unique
   password  String
   name      String
   theaters  Theaters[]
   seats     Seats[]
   tickets   Tickets[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 model Theaters {
-  theatherId        Int      @id @default(autoincrement())
+  theatherId        String      @id @default(uuid())
   name              String
   location          String
   movies            Movies[]
@@ -50,16 +50,16 @@ model Theaters {
 }
 
 model Seats {
-  seatId        Int      @id @default(autoincrement())
+  seatId        String      @id @default(uuid())
   seatNumber    String
   seatType      String
-  theaterID     Int
-  theater       Theaters @relation(fields: [theaterID], references: [theatherId])
+  theaterID     String
+  theater       Theaters    @relation(fields: [theaterID], references: [theatherId])
   users         User[]
 }
 
 model Movies {
-  movieId           Int           @id @default(autoincrement())
+  movieId           String           @id @default(uuid())
   title             String
   description       String
   duration          Int
@@ -69,29 +69,29 @@ model Movies {
 }
 
 model MovieSchedules {
-  scheduleId        Int      @id @default(autoincrement())
+  scheduleId        String      @id @default(uuid())
   startTime         DateTime
   endTime           DateTime
-  movieID           Int
-  movie             Movies   @relation(fields: [movieID], references: [movieId])
+  movieID           String
+  movie             Movies      @relation(fields: [movieID], references: [movieId])
   tickets           Tickets[]
 }
 
 model Tickets {
-  ticketId           Int      @id @default(autoincrement())
-  ticketNumber       String   @unique
+  ticketId           String         @id @default(uuid())
+  ticketNumber       String         @unique
   price              Decimal  
-  scheduleID         Int
+  scheduleID         String
   schedule           MovieSchedules @relation(fields: [scheduleID], references: [scheduleId])
-  userID             Int
-  user               User     @relation(fields: [userID], references: [userId])
-  stripe             Stripe    @relation(fields: [stripeID], references: [stripeId])
-  stripeID           Int       @unique
+  userID             String
+  user               User           @relation(fields: [userID], references: [userId])
+  stripe             Stripe         @relation(fields: [stripeID], references: [stripeId])
+  stripeID           String         @unique
 }
 
 model Stripe {
-  stripeId           Int       @id @default(autoincrement())
-  customerID         String    @unique
-  paymentMethodID    String  @unique
+  stripeId           String       @id @default(uuid())
+  customerID         String       @unique
+  paymentMethodID    String       @unique
   tickets            Tickets[]
 }
