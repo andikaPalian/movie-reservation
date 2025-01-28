@@ -91,7 +91,7 @@ const addMovies = async (req, res) => {
                     });
                 }
 
-                if (startTime > endTime) {
+                if (startTime >= endTime) {
                     return res.status(400).json({
                         message: "Start time must be before end time",
                     });
@@ -178,66 +178,140 @@ const updateMovies = async (req, res) => {
             });
         }
 
-        if (typeof title !== "string") {
-            return res.status(400).json({
-                message: "Title must be a string",
+        const existingMovies = await prisma.movies.findUnique({
+            where: {
+                movieId: moviesId,
+            },
+            include: {
+                theaters: true,
+                schedules: true,
+            }
+        });
+
+        if (!existingMovies) {
+            return res.status(404).json({
+                message: "Movies not found",
             });
         }
+        // Prepare data for update - only update fields that are provided in the request body (PATCH behavior)
+        const updateData = {};
 
-        if (typeof description !== "string") {
-            return res.status(400).json({
-                message: "Description must be a string",
-            })
+        if (title !== undefined) {
+            if (typeof title !== "string" || title.trim().length === 0) {
+                return res.status(400).json({
+                    message: "Title must be a non-empty string",
+                });
+            }
+            updateData.title = title;
         }
 
-        if (typeof duration !== "number" || duration < 0) {
-            return res.status(400).json({
-                message: "Duration must be a positive number",
+        if (description !== undefined) {
+            if (typeof description !== "string" || description.trim().length === 0) {
+                return res.status(400).json({
+                    message: "Description must be a non-empty string",
+                });
+            }
+            updateData.description = description;
+        }
+
+        if (duration !== undefined) {
+            if (typeof duration !== "number" || duration <= 0) {
+                return res.status(400).json({
+                    message: "Duration must be a positive number",
+                });
+            }
+            updateData.duration = duration;
+        }
+
+        if (releaseDate !== undefined) {
+            const parsedData = new Date(releaseDate);
+            if (isNaN(parsedData.getTime())) {
+                return res.status(400).json({
+                    message: "Invalid date format for release date",
+                });
+            }
+            updateData.releaseDate = parsedData;
+        }
+
+        if (theaters) {
+            let theatersConnections = [];
+            const existingTheaters = await prisma.theaters.findMany({
+                where: {
+                    name: {
+                        in: theaters.map(theater => theater.name),
+                    },
+                }
             });
-        }
+
+            // Menyambungkan theater yang sudah ada
+            theatersConnections = existingTheaters.map(theater => ({
+                theatherId: theater.theatherId,
+            }));
+
+            // Menambahkan theater baru yang belum ada di database
+            const newTheaters = theaters.filter(theater => !existingTheaters.some(existing => existing.name === theater.name));
+
+            if (newTheaters.length > 0) {
+                // Membuat theater baru satu persatu untuk mendapatkan ID-nya
+                const createdTheaters = await Promise.all(
+                    newTheaters.map(theater => prisma.theaters.create({
+                        data: {
+                            name: theater.name,
+                            location: theater.location || "Default Location",
+                        }
+                    }))
+                )
+
+                theatersConnections = [
+                    ...theatersConnections,
+                    ...createdTheaters.map(theater => ({
+                        theatherId: theater.theatherId
+                    }))
+                ]
+            }
+
+            updateData.theaters = {
+                disconnect: existingMovies.theaters.map(theater => ({
+                    theatherId: theater.theatherId,
+                })),
+                connect: theatersConnections
+            }
+        } 
 
         if (schedules) {
             for (const schedule of schedules) {
-                if (new Date(schedule.startTime) > new Date(schedule.endTime)) {
+                const startTime = new Date(schedule.startTime);
+                const endTime = new Date(schedule.endTime);
+
+                if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                    return res.status(400).json({
+                        message: "Invalid date format in schedule",
+                    });
+                }
+
+                if (startTime >= endTime) {
                     return res.status(400).json({
                         message: "Start time must be before end time",
                     });
                 }
             }
-        }
-
-        const movies = await prisma.movies.findUnique({
-            where: {
-                movieId: moviesId,
+            updateData.schedules = {
+                deleteMany: {},
+                create: schedules.map(schedule => ({
+                    startTime: new Date(schedule.startTime),
+                    endTime: new Date(schedule.endTime),
+                }))
             }
-        });
-        if (!movies) {
-            return res.status(404).json({
-                message: "Movies not found",
-            });
         }
 
         const updatedMovies = await prisma.movies.update({
             where: {
                 movieId: moviesId,
             },
-            data: {
-                title,
-                description,
-                duration,
-                releaseDate: new Date(releaseDate),
-                schedules: {
-                    deleteMany: {}, // Hapus semua jadwal yang ada sebelumnnya, sebelum membuat jadwal baru
-                    create: schedules?.map(schedule => ({
-                        startTime: new Date(schedule.startTime),
-                        endTime: new Date(schedule.endTime),
-                    })) || [],
-                },
-                theaters: {
-                    connect: theaters?.map(id => ({
-                        theatherId: id,
-                    })) || [],  
-                }
+            data: updateData,
+            include: {
+                theaters: true,
+                schedules: true,
             }
         });
         res.status(200).json({
