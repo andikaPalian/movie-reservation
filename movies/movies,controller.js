@@ -30,7 +30,7 @@ const addMovies = async (req, res) => {
             });
         }
 
-        // Validasi ID Theater
+        // Validasi Theater 
         let theatersConnections = [];
         if (theaters) {
             const existingTheaters = await prisma.theaters.findMany({
