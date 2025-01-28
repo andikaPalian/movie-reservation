@@ -18,14 +18,44 @@ const addTheaters = async (req, res) => {
             });
         }
 
+        let movieConnections = [];
+        if (movies) {
+            const existingMovies = await prisma.movies.findMany({
+                where: {
+                    title: {
+                        in: movies.map(movie => movie.title)
+                    }
+                }
+            });
+
+            movieConnections = existingMovies.map(movie => ({
+                movieId: movie.movieId,
+            }));
+
+            const newMovies = movies.filter(movie => !existingMovies.some(existing => existing.title === movie.title));
+            
+            if (newMovies.length > 0) {
+                const createdMovies = await Promise.all(
+                    newMovies.map(movie => prisma.movies.create({
+                        data: movie,
+                    }))
+                )
+                movieConnections = [
+                    ...movieConnections,
+                    ...createdMovies.map(movie => ({
+                        movieId: movie.movieId
+                    }))
+                ]
+            }
+
+        }
+
         const theater = await prisma.theaters.create({
             data: {
                 name,
                 location,
                 movies: {
-                    connect: movies?.map(id => ({
-                        moviesId: id,
-                    })) || []
+                    connect: movieConnections,
                 }
             }
         });
