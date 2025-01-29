@@ -7,8 +7,8 @@ const moviesRouter = express.Router();
 
 // Admin only
 moviesRouter.post("/movies", adminValidation, hasRole([AdminRole.THEATHER_ADMIN, AdminRole.SUPER_ADMIN]), addMovies);
-moviesRouter.patch("/movies", adminValidation, hasRole([AdminRole.THEATHER_ADMIN, AdminRole.SUPER_ADMIN]), updateMovies);
-moviesRouter.delete("/movies", adminValidation, hasRole([AdminRole.THEATHER_ADMIN, AdminRole.SUPER_ADMIN]), deleteMovies);
+moviesRouter.patch("/movies/:moviesId", adminValidation, hasRole([AdminRole.THEATHER_ADMIN, AdminRole.SUPER_ADMIN]), updateMovies);
+moviesRouter.delete("/movies/:moviesId", adminValidation, hasRole([AdminRole.THEATHER_ADMIN, AdminRole.SUPER_ADMIN]), deleteMovies);
 
 // Public
 moviesRouter.get("/movies", listMovies);
