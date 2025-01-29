@@ -19,6 +19,13 @@ enum AdminRole {
   ADMIN
 }
 
+enum TicketStatus {
+  PENDING
+  CONFIRMED
+  USED
+  CANCELED
+}
+
 model Admin {
   adminId   String      @id @default(uuid())
   username  String      @unique
@@ -26,6 +33,7 @@ model Admin {
   role      AdminRole   
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+  theater   Theaters[]
 }
 
 model User {
@@ -33,8 +41,8 @@ model User {
   email     String      @unique
   password  String
   name      String
-  theaters  Theaters[]
-  seats     Seats[]
+  // theaters  Theaters[]
+  // seats     Seats[]
   tickets   Tickets[]
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -44,9 +52,13 @@ model Theaters {
   theatherId        String      @id @default(uuid())
   name              String
   location          String
+  capacity          Int
   movies            Movies[]
-  users             User[]
+  movieSchedule     MovieSchedules[]
+  // users             User[]
   seats             Seats[]
+  adminID           String?
+  admin             Admin?       @relation(fields: [adminID], references: [adminId])
 }
 
 model Seats {
@@ -55,7 +67,8 @@ model Seats {
   seatType      String
   theaterID     String
   theater       Theaters    @relation(fields: [theaterID], references: [theatherId])
-  users         User[]
+  // users         User[]
+  tickets       Tickets[]
 }
 
 model Movies {
@@ -74,6 +87,8 @@ model MovieSchedules {
   endTime           DateTime
   movieID           String
   movie             Movies      @relation(fields: [movieID], references: [movieId])
+  theaterID         String
+  theater           Theaters    @relation(fields: [theaterID], references: [theatherId])
   tickets           Tickets[]
 }
 
@@ -81,12 +96,15 @@ model Tickets {
   ticketId           String         @id @default(uuid())
   ticketNumber       String         @unique
   price              Decimal  
+  status             TicketStatus   @default(PENDING)
   scheduleID         String
   schedule           MovieSchedules @relation(fields: [scheduleID], references: [scheduleId])
   userID             String
   user               User           @relation(fields: [userID], references: [userId])
   stripe             Stripe         @relation(fields: [stripeID], references: [stripeId])
   stripeID           String         @unique
+  seatID             String?
+  seat               Seats?          @relation(fields: [seatID], references: [seatId])
 }
 
 model Stripe {
