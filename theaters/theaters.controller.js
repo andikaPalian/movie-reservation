@@ -349,7 +349,33 @@ const addUserToTheaters = async (req, res) => {
 
 const listTheaters = async (req, res) => {
     try {
-        const {search} = req.query;
+        const {search, page = 1, limit = 10, sortBy = "name", sortOrder = "asc"} = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        if (isNaN(parseInt(page)) || parseInt(page) < 1) {
+            return res.status(400).json({
+                message: "Invalid page number",
+            });
+        }
+
+        if (isNaN(parseInt(limit)) || parseInt(limit) < 1) {
+            return res.status(400).json({
+                message: "Invalid limit",
+            });
+        }
+
+        const totalCount = await prisma.theaters.count({
+            where: {
+                name: {
+                    contains: search || "",
+                    mode: "insensitive",
+                }
+            }
+        });
+
+        const orderBy = {};
+        orderBy[sortBy] = sortOrder.toLowerCase();
+        
         const theaters = await prisma.theaters.findMany({
             where: {
                 name: {
@@ -358,13 +384,61 @@ const listTheaters = async (req, res) => {
                 }
             },
             include: {
-                movies: true,
-                seats: true,
-            }
+                movies: {
+                    select: {
+                        title: true,
+                        duration: true,
+                        releaseDate: true,
+                    }
+                },
+                seats: {
+                    select: {
+                        seatNumber: true,
+                        seatType: true,
+                    }
+                },
+                _count: {
+                    select: {
+                        seats: true,
+                        movies: true,
+                    }
+                }
+            },
+            orderBy,
+            skip,
+            take: parseInt(limit),
         });
+
+        const processedTheaters = theaters.map(theater => {
+            const seatsByType = theater.seats.reduce((acc, seat) => {
+                if (!acc[seat.seatType]) {
+                    acc[seat.seatType] = 0;
+                }
+                acc[seat.seatType]++;
+                return acc;
+            }, {});
+
+            return {
+                name: theater.name,
+                location: theater.location,
+                moviesCount: theater._count.movies,
+                movies: theater.movies,
+                seatsInfo: {
+                    totalSeats: theater._count.seats,
+                    seatsByType,
+                    seats: theater.seats.sort((a, b) => a.seatNumber.localeCompare(b.seatNumber)),
+                }
+            }
+        })
         res.status(200).json({
             message: "Theaters listed successfully",
-            theaters: theaters
+            pagination: {
+                total: totalCount,
+                pages: Math.ceil(totalCount / parseInt(limit)),
+                currentPage: parseInt(page),
+                limit: parseInt(limit),
+            },
+            theaters: processedTheaters,
         });
     } catch (error) {
         console.error("Error during listing theaters:", error);
