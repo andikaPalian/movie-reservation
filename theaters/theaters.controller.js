@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 const addTheaters = async (req, res) => {
     try {
-        const {name, location, movies, seats} = req.body;
+        const {name, location, movies, seats, capacity} = req.body;
 
         if (typeof name !== "string" || name.trim().length === 0) {
             return res.status(400).json({
@@ -16,6 +16,12 @@ const addTheaters = async (req, res) => {
             return res.status(400).json({
                 message: "Location is required and must be a string",
             });
+        }
+
+        if (typeof capacity !== "number" || capacity <= 0) {
+            return res.status(400).json({
+                message: "Capacity is required and must be a positive number",
+            })
         }
 
         // Settingan default untuk konfigurasi kursi jika tidak diberikan
@@ -39,6 +45,14 @@ const addTheaters = async (req, res) => {
         };
 
         const finalSeatsConfig = seats || defaultSeatsConfig;
+
+        // Validasi total seats dengan capacity
+        const totalSeats = finalSeatsConfig.rows * finalSeatsConfig.seatsPerRow;
+        if (totalSeats !== capacity) {
+            return res.status(400).json({
+                message: "Total seats configuration does not match theater capacity",
+            })
+        }
 
         const seatsData = [];
         for (let row = 1; row <= finalSeatsConfig.rows; row++) {
@@ -99,6 +113,7 @@ const addTheaters = async (req, res) => {
             data: {
                 name,
                 location,
+                capacity,
                 movies: {
                     connect: movieConnections,
                 },
@@ -135,7 +150,7 @@ const addTheaters = async (req, res) => {
 const updateTheaters = async (req, res) => {
     try {
         const theatersId = req.params.id;
-        const {name, location, movies} = req.body;
+        const {name, location, movies, capacity} = req.body;
 
         if (!theatersId) {
             return res.status(400).json({
@@ -149,6 +164,7 @@ const updateTheaters = async (req, res) => {
             },
             include: {
                 movies: true,
+                seats: true,
             }
         });
         if (!existingTheaters) {
@@ -174,6 +190,22 @@ const updateTheaters = async (req, res) => {
                     message: "Location must be a non-empty string",
                 });
             }
+        }
+
+        if (capacity !== undefined) {
+            if (typeof capacity !== "number" || capacity <= 0) {
+                return res.status(400).json({
+                    messaga: "Capacity must be a positive number",
+                });
+            }
+
+            // Cek apakah capacity baru sesuai dengan jumlah seats saat ini
+            if (existingTheaters.seats.length !== capacity) {
+                return res.status(400).json({
+                    message: "Cannot update capacity as it would conflict with existing seats configuration"
+                })
+            }
+            updateData.capacity = capacity;
         }
 
         if (movies) {
@@ -227,11 +259,26 @@ const updateTheaters = async (req, res) => {
             data: updateData,
             include: {
                 movies: true,
+                seats: {
+                    select: {
+                        seatId: true,
+                        seatNumber: true,
+                        seatType: true,
+                    }
+                }
             }
         });
         res.status(200).json({
             message: "Theater updated succssfully",
-            theater: updatedTheater,
+            theater: {
+                ...updatedTheater,
+                seatCount: updatedTheater.seats.length,
+                seatTypes: {
+                    regular: updatedTheater.seats.filter(seat => seat.seatType === "regular").length,
+                    vip: updatedTheater.seats.filter(seat => seat.seatType === "vip").length,
+                    premium: updatedTheater.seats.filter(seat => seat.seatType === "premium").length,
+                }
+            },
         })
     } catch (error) {
         console.error("Error during updating theater:", error);
@@ -268,81 +315,138 @@ const deleteTheaters = async (req, res) => {
     }
 }
 
-const addUserToTheaters = async (req, res) => {
+const updateTheatersSeats = async (req, res) => {
     try {
         const theatersId = req.params.id;
-        const {userId} = req.body;
+        const {seats} = req.body;
 
+        // Mencari theater berdasarkan ID dan tickets yang memiliki status "PENDING" atau "CONFIRMED"/aktif
         const existingTheaters = await prisma.theaters.findUnique({
             where: {
                 theatherId: theatersId,
             },
             include: {
-                users: true,
+                seats: {
+                    include: {
+                        tickets: {
+                            where: {
+                                status: {
+                                    in: ["PENDING", "CONFIRMED"],
+                                }
+                            }
+                        }
+                    }
+                }
             }
         });
+
         if (!existingTheaters) {
             return res.status(404).json({
-                message: "Theaters not found",
+                message: "Theater not found",
             });
         }
 
-        const existingUser = await prisma.user.findUnique({
-            where: {
-                userId: userId,
-            }
-        });
-        if (!existingUser) {
-            return res.status(404).json({
-                message: "User not found",
-            });
-        }
-
-        const isAlreadyAdded = existingTheaters.users.some(user => user.userId === userId);
-        if (isAlreadyAdded) {
+        // Cek untuk aktif tickets
+        const hasActiveTickets = existingTheaters.seats.some(seat => seat.tickets.length > 0);
+        if (hasActiveTickets) {
             return res.status(400).json({
-                message: "User is already added to the theaters",
+                message: "Cannot update seats configuration while there are active tickets",
             });
         }
 
-        const theaters = await prisma.theaters.update({
-            where: {
-                theatherId: theatersId,
-            },
-            data: {
-                users: {
-                    connect: {
-                        userId: userId,
-                    }
+        // Validasi konfigurasi kursi
+        if (!seats || !seats.rows || !seats.seatsPerRow || !seats.types) {
+            return res.status(400).json({
+                message: "Invalid seats configuration provided",
+            });
+        }
+
+        const totalSeats = seats.rows * seats.seatsPerRow;
+        if (totalSeats !== existingTheaters.seats.length) {
+            return res.status(400).json({
+                message: "Total seats much match theaters capacity",
+            });
+        }
+
+        // Generate new seats data
+        const newSeatsData = [];
+        for (let row = 1; row <= seats.rows; row++) {
+            for (let seat = 1; seat <= seats.seatsPerRow; seat++) {
+                let seatType = "regular";
+                if (seats.types.premium?.rows?.include(row)) {
+                    seatType = "premium";
+                } else if (seats.types.vip?.rows?.include(row)) {
+                    seatType = "vip";
                 }
-            },
-            include: {
-                users: {
-                    select: {
-                        userId: true,
-                        email: true,
-                        name: true,
-                        createdAt: true,
-                        updatedAt: true,
-                    }
-                }
+
+                const rowLetter = String.fromCharCode(64 + row);
+                const seatNumber = `${rowLetter}${seat}`;
+
+                newSeatsData.push({
+                    seatNumber,
+                    seatType
+                });
             }
+        }
+
+        // Melakukan pembaruan dalam transaksi
+        const result = await prisma.$transaction(async (prisma) => {
+            // Menghapus kursi yang ada
+            await prisma.seats.deleteMany({
+                where: {
+                    theaterID: theatersId,
+                }
+            });
+
+            // Membuat kursi baru
+            const updatedTheater = await prisma.theaters.update({
+                where: {
+                    theatherId: theatersId,
+                },
+                data: {
+                    seats: {
+                        create: newSeatsData,
+                    }
+                },
+                include: {
+                    seats: {
+                        select: {
+                            seatId: true,
+                            seatNumber: true,
+                            seatType: true,
+                        }
+                    }
+                }
+            });
+            return updatedTheater;
         });
+
+        // Prepare response 
+        const seatsByType = result.seats.reduce((acc, seat) => {
+            if (!acc[seat.seatType]) {
+                acc[seat.seatType] = 0;
+            }
+            acc[seat.seatType]++;
+            return acc;
+        }, {});
 
         res.status(200).json({
-            message: "User added to theaters successfully",
-            theaters: {
-                theatersId: theaters.theatherId,
-                name: theaters.name,
-                location: theaters.location,
-                users: theaters.users
-            },
-        })
+            message: "Theater seats updated successfully",
+            theater: {
+                theatersId: result.theatherId,
+                name: result.name,
+                seatsInfo: {
+                    totalSeats: result.seats.length,
+                    seatsByType,
+                    seats: result.seats.sort((a, b) => a.seatNumber.localeCompare(b.seatNumber)),
+                }
+            }
+        });
     } catch (error) {
-        console.error("Error during adding user to theaters:", error);
+        console.error("Error during update theater seats:", error);
         return res.status(500).json({
             message: "Internal server error",
-            error: error.message || "An unexpected error occurred",
+            error: error.messaga || "An unexpected error occurred",
         });
     }
 }
@@ -450,4 +554,4 @@ const listTheaters = async (req, res) => {
     }
 }
 
-export {addTheaters, updateTheaters, deleteTheaters, addUserToTheaters, listTheaters};
+export {addTheaters, updateTheaters, deleteTheaters, updateTheatersSeats, listTheaters};
