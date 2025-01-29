@@ -419,6 +419,7 @@ const listTheaters = async (req, res) => {
             }, {});
 
             return {
+                theatersId: theater.theatherId,
                 name: theater.name,
                 location: theater.location,
                 moviesCount: theater._count.movies,
