@@ -169,7 +169,7 @@ const listMovies = async (req, res) => {
 
 const updateMovies = async (req, res) => {
     try {
-        const moviesId = req.params.id;
+        const moviesId = req.params;
         const {title, description, duration, releaseDate, schedules, theaters} = req.body;
 
         if (!moviesId) {
@@ -329,7 +329,7 @@ const updateMovies = async (req, res) => {
 
 const deleteMovies = async (req, res) => {
     try {
-        const moviesId = req.params.id;
+        const moviesId = req.params;
         if (!moviesId) {
             return res.status(400).json({
                 message: "Movies ID is required",
