@@ -149,7 +149,7 @@ const addTheaters = async (req, res) => {
 
 const updateTheaters = async (req, res) => {
     try {
-        const theatersId = req.params.id;
+        const theatersId = req.params;
         const {name, location, movies, capacity} = req.body;
 
         if (!theatersId) {
@@ -291,7 +291,7 @@ const updateTheaters = async (req, res) => {
 
 const deleteTheaters = async (req, res) => {
     try {
-        const theatersId = req.params.id;
+        const theatersId = req.params;
         if (!theatersId) {
             return res.status(400).json({
                 message: "Theaters ID is required",
@@ -317,7 +317,7 @@ const deleteTheaters = async (req, res) => {
 
 const updateTheatersSeats = async (req, res) => {
     try {
-        const theatersId = req.params.id;
+        const theatersId = req.params;
         const {seats} = req.body;
 
         // Mencari theater berdasarkan ID dan tickets yang memiliki status "PENDING" atau "CONFIRMED"/aktif
