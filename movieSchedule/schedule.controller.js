@@ -19,7 +19,7 @@ const listSchedule = async (req, res) => {
         // Jalankan transaksi Prisma untuk mengambil data & menghitung total
         const [schedules, total] = await prisma.$transaction([
             prisma.movieSchedules.findMany({
-                where: whereCondition,
+                where: where,
                 skip,
                 take: parseInt(limit),
                 include: {
@@ -55,7 +55,7 @@ const listSchedule = async (req, res) => {
                 }
             }),
             prisma.movieSchedules.count({
-                where: whereCondition
+                where: where
             })
         ]);
 
