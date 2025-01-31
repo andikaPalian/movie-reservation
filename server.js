@@ -6,6 +6,7 @@ import moviesRouter from './movies/movies.routes.js';
 import theatersRouter from './theaters/theaters.routes.js';
 import seatsRouter from './seats/seats.routes.js';
 import scheduleRouter from './movieSchedule/schedule.routes.js';
+import ticketsRouter from './tickets/tickets.routes.js';
 
 const app = express();
 const port = process.env.PORT;
@@ -18,6 +19,7 @@ app.use("/api/movies", moviesRouter);
 app.use("/api/theaters", theatersRouter);
 app.use("/api/seats", seatsRouter);
 app.use("/api/schedule", scheduleRouter);
+app.use("/api/tickets", ticketsRouter);
 
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
