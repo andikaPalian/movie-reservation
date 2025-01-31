@@ -109,6 +109,9 @@ const addMovies = async (req, res) => {
                     create: schedules?.map(schedule => ({
                         startTime: new Date(schedule.startTime),
                         endTime: new Date(schedule.endTime),
+                        theater: {
+                            connect: theatersConnections[0]
+                        }
                     })) || [],
                 },
                 theaters: {
