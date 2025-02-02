@@ -20,13 +20,9 @@ const createSetupIntent = async (req, res) => {
         }
 
         // Cek apakah user sudah punya customer di stripe
-        const stripeCustomer = await prisma.stripe.findFirst({
+        let stripeCustomer = await prisma.stripe.findFirst({
             where: {
-                tickets: {
-                    some: {
-                        userID: userId
-                    }
-                }
+                customerID: userId,
             }
         });
         // Jika tidak ada, buat customer baru di stripe
@@ -41,7 +37,7 @@ const createSetupIntent = async (req, res) => {
                     stripeId: customer.id,
                     customerID: customer.id,
                     // Akan diperbarui ketika user melakukan pembayaran / ketika metode pembayaran dilampirkan
-                    paymentMethodID: "",
+                    paymentMethodID: null,
                 }
             });
         }
@@ -85,7 +81,7 @@ const listPaymentMethod = async (req, res) => {
         }
 
         const paymentMethods = await stripe.paymentMethods.list({
-            custome: stripeCustomer.customerID,
+            customer: stripeCustomer.customerID,
             type: "card",
         })
         res.status(200).json({
