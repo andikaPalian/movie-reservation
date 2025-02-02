@@ -105,12 +105,13 @@ model Tickets {
   stripeID           String         @unique
   seatID             String?
   seat               Seats?          @relation(fields: [seatID], references: [seatId])
+  seatType           String?
   bookTime           DateTime        @default(now())
 }
 
 model Stripe {
   stripeId           String       @id @default(uuid())
   customerID         String       @unique
-  paymentMethodID    String       @unique
+  paymentMethodID    String?       @unique
   tickets            Tickets[]
 }
