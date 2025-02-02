@@ -4,16 +4,16 @@ import Stripe from 'stripe';
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const calculateTicketPrice = (seatType) => {
-    const prices = {
-        regular: 50000,
-        vip: 75000,
-        premium: 100000,
-    };
+// const calculateTicketPrice = (seatType) => {
+//     const prices = {
+//         regular: 50000,
+//         vip: 75000,
+//         premium: 100000,
+//     };
 
-    // Default ke regular jika seatType tidak ditemukan
-    return prices[seatType] || prices.regular;
-}
+//     // Default ke regular jika seatType tidak ditemukan
+//     return prices[seatType] || prices.regular;
+// }
 
 const createTicket = async (req, res) => {
     try {
@@ -106,7 +106,7 @@ const createTicket = async (req, res) => {
 
         // Calculate price (implementasi logika harga sesuai kebutuhan)
         // Rp 100.000
-        const amount = calculateTicketPrice(seat.seatType);
+        const amount = 20000000000;
 
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amount,
